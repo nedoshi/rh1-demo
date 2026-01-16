@@ -1,0 +1,18 @@
+apiVersion: datasciencecluster.opendatahub.io/v1
+kind: DataScienceCluster
+metadata:
+  name: default
+  namespace: demo2-genai-poisoning
+spec:
+  components:
+    modelmeshserving:
+      managementState: Managed
+    kserve:
+      managementState: Managed
+    dashboard:
+      managementState: Managed
+    workbenches:
+      managementState: Managed
+    data-science-pipelines-operator:
+      managementState: Managed
+

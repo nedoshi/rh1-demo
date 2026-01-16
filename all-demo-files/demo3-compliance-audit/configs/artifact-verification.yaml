@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: artifact-verification
+  namespace: demo3-compliance-audit
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: verifier
+        image: quay.io/flyers22/artifact-verifier:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Verifying AWS artifacts... 15 signed images verified"
+            echo "Verifying Azure artifacts... 12 signed images verified"
+            echo "Verifying OpenShift artifacts... 8 signed images verified"
+            echo "Total: 35 signed artifacts verified"
+  backoffLimit: 1

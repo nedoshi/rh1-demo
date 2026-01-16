@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-connector
+  namespace: demo3-compliance-audit
+  labels:
+    app: aws-connector
+    cloud: aws
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aws-connector
+  template:
+    metadata:
+      labels:
+        app: aws-connector
+    spec:
+      containers:
+      - name: connector
+        image: quay.io/flyers22/aws-connector:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: ECR_REGISTRY
+          value: "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+        volumeMounts:
+        - name: credentials
+          mountPath: /etc/aws
+          readOnly: true
+      volumes:
+      - name: credentials
+        secret:
+          secretName: aws-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aws-connector
+  namespace: demo3-compliance-audit
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: aws-connector
+

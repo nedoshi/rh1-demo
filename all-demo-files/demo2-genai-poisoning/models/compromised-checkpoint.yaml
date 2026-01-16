@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compromised-checkpoint
+  namespace: demo2-genai-poisoning
+  labels:
+    app: genai-model
+    type: checkpoint
+    status: compromised
+data:
+  checkpoint-info.json: |
+    {
+      "model_name": "llm-model-v1",
+      "version": "1.0.0",
+      "checkpoint_path": "/models/compromised-checkpoint.pt",
+      "metadata": {
+        "signature": null,
+        "signature_verified": false,
+        "author": "unknown",
+        "source": "external",
+        "compromised": true,
+        "verification_status": "FAILED"
+      },
+      "warnings": [
+        "Model checkpoint is not cryptographically signed",
+        "Source cannot be verified",
+        "Model may contain backdoors or malicious code"
+      ]
+    }
+  verification-report.json: |
+    {
+      "checkpoint": "compromised-checkpoint.pt",
+      "verification": {
+        "signature_present": false,
+        "signature_valid": false,
+        "source_verified": false,
+        "checksum_match": false,
+        "status": "REJECTED"
+      },
+      "reasons": [
+        "Missing cryptographic signature",
+        "Unknown source",
+        "Cannot verify integrity"
+      ]
+    }
+

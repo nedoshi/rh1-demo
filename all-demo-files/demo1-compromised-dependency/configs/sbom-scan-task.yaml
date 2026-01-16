@@ -1,0 +1,94 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: sbom-generator
+  namespace: demo1-compromised-dependency
+  labels:
+    app: sbom-scanner
+    demo: compromised-dependency
+spec:
+  description: Generate Software Bill of Materials for vulnerable app
+  params:
+    - name: IMAGE_URL
+      description: Container image URL to scan
+      type: string
+    - name: APP_NAME
+      description: Application name
+      default: vulnerable-app
+      type: string
+  workspaces:
+    - name: workspace
+      description: Workspace for storing SBOM output
+  steps:
+    - name: generate-sbom
+      image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        IMAGE_URL=$(params.IMAGE_URL)
+        APP_NAME=$(params.APP_NAME)
+        WORKSPACE=$(workspaces.workspace.path)
+        
+        echo "📦 Generating SBOM for: ${APP_NAME}"
+        echo "Image: ${IMAGE_URL}"
+        
+        # Generate SBOM in SPDX format
+        cat > ${WORKSPACE}/sbom.spdx.json <<EOF
+        {
+          "spdxVersion": "SPDX-2.3",
+          "dataLicense": "CC0-1.0",
+          "SPDXID": "SPDXRef-DOCUMENT",
+          "name": "${APP_NAME}-sbom",
+          "documentNamespace": "https://redhat.com/demo/${APP_NAME}/sbom",
+          "creationInfo": {
+            "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "creators": ["Tool: Red Hat Trusted Supply Chain Demo"]
+          },
+          "packages": [
+            {
+              "SPDXID": "SPDXRef-Package-log4js",
+              "name": "log4js",
+              "versionInfo": "6.3.0",
+              "supplier": "NOASSERTION",
+              "downloadLocation": "NOASSERTION",
+              "filesAnalyzed": false,
+              "externalRefs": [
+                {
+                  "referenceCategory": "SECURITY",
+                  "referenceType": "cpe23Type",
+                  "referenceLocator": "cpe:2.3:a:log4js:log4js:6.3.0:*:*:*:*:*:*:*"
+                }
+              ]
+            },
+            {
+              "SPDXID": "SPDXRef-Package-express",
+              "name": "express",
+              "versionInfo": "4.17.1",
+              "supplier": "NOASSERTION",
+              "downloadLocation": "NOASSERTION",
+              "filesAnalyzed": false
+            },
+            {
+              "SPDXID": "SPDXRef-Package-node",
+              "name": "node",
+              "versionInfo": "16-alpine",
+              "supplier": "Organization: Node.js Foundation",
+              "downloadLocation": "NOASSERTION",
+              "filesAnalyzed": false
+            }
+          ],
+          "relationships": [
+            {
+              "spdxElementId": "SPDXRef-DOCUMENT",
+              "relationshipType": "DESCRIBES",
+              "relatedSpdxElement": "SPDXRef-Package-${APP_NAME}"
+            }
+          ]
+        }
+        EOF
+        
+        echo "✅ SBOM generated successfully"
+        echo "📄 SBOM file: ${WORKSPACE}/sbom.spdx.json"
+        ls -lh ${WORKSPACE}/
+

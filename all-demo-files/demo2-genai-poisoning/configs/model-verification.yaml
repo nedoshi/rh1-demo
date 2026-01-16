@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-verification
+  namespace: demo2-genai-poisoning
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: verifier
+        image: quay.io/flyers22/model-verifier:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Verifying model checkpoint..."
+            if [ ! -f /models/compromised-checkpoint.pt.sig ]; then
+              echo "Signature Present: NO"
+              echo "Signature Valid: NO"
+              echo "Source Verified: NO"
+              echo "Status: REJECTED"
+              exit 0
+            fi
+            echo "Signature Present: YES"
+            rhtas verify /models/compromised-checkpoint.pt && echo "Signature Valid: YES" || echo "Signature Valid: NO"
+            echo "Source Verified: NO"
+            echo "Status: REJECTED"
+        volumeMounts:
+        - name: models
+          mountPath: /models
+      volumes:
+      - name: models
+        configMap:
+          name: compromised-checkpoint
+  backoffLimit: 1

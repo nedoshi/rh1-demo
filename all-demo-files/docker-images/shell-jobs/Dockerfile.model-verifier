@@ -1,0 +1,18 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+
+# Install basic tools
+RUN microdnf install -y curl && \
+    microdnf clean all
+
+# Create a mock rhtas command (since rhtas-cli may not be available)
+RUN echo '#!/bin/sh' > /usr/local/bin/rhtas && \
+    echo 'if [ "$1" = "verify" ]; then' >> /usr/local/bin/rhtas && \
+    echo '  # Mock verification - always returns failure for demo purposes' >> /usr/local/bin/rhtas && \
+    echo '  exit 1' >> /usr/local/bin/rhtas && \
+    echo 'else' >> /usr/local/bin/rhtas && \
+    echo '  echo "rhtas: unknown command $1"' >> /usr/local/bin/rhtas && \
+    echo '  exit 1' >> /usr/local/bin/rhtas && \
+    echo 'fi' >> /usr/local/bin/rhtas && \
+    chmod +x /usr/local/bin/rhtas
+
+# Note: No ENTRYPOINT - script will be provided via command/args in YAML

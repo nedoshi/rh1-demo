@@ -1,0 +1,230 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admission-webhook
+  namespace: demo1-compromised-dependency
+  labels:
+    app: admission-webhook
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webhook-server
+  namespace: demo1-compromised-dependency
+  labels:
+    app: admission-webhook
+data:
+  webhook-server.py: |
+    #!/usr/bin/env python3
+    import json
+    import os
+    import sys
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import ssl
+
+    VULNERABILITY_DB = os.getenv('VULNERABILITY_DB', '{}')
+    try:
+        VULN_DATA = json.loads(VULNERABILITY_DB)
+    except:
+        VULN_DATA = {}
+
+    class WebhookHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == '/health':
+                self.handle_health()
+            else:
+                self.send_error(404)
+        
+        def do_POST(self):
+            if self.path == '/validate':
+                self.handle_validate()
+            elif self.path == '/health':
+                self.handle_health()
+            else:
+                self.send_error(404)
+        
+        def handle_health(self):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "healthy"}).encode())
+        
+        def handle_validate(self):
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                admission_review = json.loads(post_data.decode('utf-8'))
+                request = admission_review.get('request', {})
+                object_data = request.get('object', {})
+                metadata = object_data.get('metadata', {})
+                annotations = metadata.get('annotations', {})
+                labels = metadata.get('labels', {})
+                
+                allowed = True
+                message = "Deployment allowed"
+                
+                cve_detected = annotations.get('cve.detected', '')
+                if cve_detected and cve_detected != 'none':
+                    allowed = False
+                    message = f"Deployment blocked: Critical vulnerability detected ({cve_detected})"
+                
+                if labels.get('malicious') == 'true' or labels.get('vulnerable') == 'true':
+                    allowed = False
+                    message = "Deployment blocked: Malicious or vulnerable deployment detected"
+                
+                signature_verified = annotations.get('signature.verified', '')
+                if signature_verified == 'false':
+                    allowed = False
+                    message = "Deployment blocked: Image signature not verified"
+                
+                vuln_scan = annotations.get('vulnerability.scan', '')
+                if vuln_scan == 'true' and annotations.get('cve.detected', '') != 'none':
+                    allowed = False
+                    message = "Deployment blocked: Vulnerability scan detected issues"
+                
+                uid = request.get('uid', '')
+                response = {
+                    "apiVersion": "admission.k8s.io/v1",
+                    "kind": "AdmissionReview",
+                    "response": {
+                        "uid": uid,
+                        "allowed": allowed,
+                        "status": {
+                            "code": 200 if allowed else 403,
+                            "message": message
+                        }
+                    }
+                }
+                
+                print(f"[{self.client_address[0]}] Deployment: {metadata.get('name', 'unknown')} - {'ALLOWED' if allowed else 'BLOCKED'}: {message}")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
+                
+            except Exception as e:
+                print(f"Error: {e}", file=sys.stderr)
+                self.send_error(500, str(e))
+        
+        def log_message(self, format, *args):
+            print(f"[{self.client_address[0]}] {format % args}")
+
+    def main():
+        port = int(os.getenv('WEBHOOK_PORT', '8443'))
+        cert_file = os.getenv('TLS_CERT_FILE', '/etc/certs/tls.crt')
+        key_file = os.getenv('TLS_KEY_FILE', '/etc/certs/tls.key')
+        
+        server = HTTPServer(('0.0.0.0', port), WebhookHandler)
+        
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(cert_file, key_file)
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+            print(f"Webhook server starting with TLS on port {port}")
+        else:
+            print(f"WARNING: Certificates not found, starting without TLS on port {port}")
+        
+        print("Vulnerability Validator Webhook Server ready")
+        
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nShutting down...")
+            server.shutdown()
+
+    if __name__ == '__main__':
+        main()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admission-webhook
+  namespace: demo1-compromised-dependency
+  labels:
+    app: admission-webhook
+    demo: compromised-dependency
+  annotations:
+    admission-webhook-ignore: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admission-webhook
+  template:
+    metadata:
+      labels:
+        app: admission-webhook
+    spec:
+      serviceAccountName: admission-webhook
+      containers:
+      - name: webhook
+        image: registry.access.redhat.com/ubi8/python-39:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            # Copy script and make executable
+            cp /app/webhook-server.py /tmp/webhook-server.py
+            chmod +x /tmp/webhook-server.py
+            # Run with python3
+            python3 /tmp/webhook-server.py
+        ports:
+        - containerPort: 8443
+          name: webhook
+        env:
+        - name: WEBHOOK_PORT
+          value: "8443"
+        - name: TLS_CERT_FILE
+          value: "/etc/certs/tls.crt"
+        - name: TLS_KEY_FILE
+          value: "/etc/certs/tls.key"
+        - name: VULNERABILITY_DB
+          valueFrom:
+            configMapKeyRef:
+              name: vulnerability-database
+              key: vulnerabilities.json
+        volumeMounts:
+        - name: webhook-script
+          mountPath: /app
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8443
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+      volumes:
+      - name: webhook-script
+        configMap:
+          name: webhook-server
+          defaultMode: 0755
+      - name: certs
+        secret:
+          secretName: admission-webhook-certs
+          optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admission-webhook
+  namespace: demo1-compromised-dependency
+spec:
+  ports:
+  - port: 443
+    targetPort: 8443
+  selector:
+    app: admission-webhook
+

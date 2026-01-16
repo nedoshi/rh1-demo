@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: sign-image
+  namespace: demo1-compromised-dependency
+spec:
+  params:
+    - name: IMAGE_URL
+      description: Container image URL to sign
+  steps:
+    - name: sign
+      image: quay.io/redhat-appstudio/rhtas-cli:latest
+      script: |
+        #!/bin/bash
+        rhtas sign $(params.IMAGE_URL) --key-file /workspace/signing-key.pem
+        echo "Image signed successfully"
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: signing-key
+          mountPath: /workspace/signing-key.pem
+          subPath: signing-key.pem
+  volumes:
+    - name: workspace
+      persistentVolumeClaim:
+        claimName: signing-workspace
+    - name: signing-key
+      secret:
+        secretName: signing-key-secret
+

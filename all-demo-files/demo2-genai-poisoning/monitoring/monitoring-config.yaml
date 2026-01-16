@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-assistant-config
+  namespace: demo2-genai-poisoning
+data:
+  config.yaml: |
+    monitoring:
+      enabled: true
+      inference_tracking: true
+      anomaly_detection: true
+    threat_detection:
+      prompt_injection: true
+      model_manipulation: true
+      data_exfiltration: true
+    alerts:
+      - type: malicious_prompt
+        severity: high
+        action: block
+      - type: anomalous_behavior
+        severity: medium
+        action: alert
+      - type: model_tampering
+        severity: critical
+        action: block
+

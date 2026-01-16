@@ -1,0 +1,39 @@
+FROM registry.access.redhat.com/ubi8/python-39:latest
+
+# Install dependencies
+RUN pip3 install --no-cache-dir flask
+
+# Set working directory (creates directory automatically)
+WORKDIR /app
+
+# Create application file
+RUN echo 'from flask import Flask, jsonify' > app.py && \
+    echo 'import os' >> app.py && \
+    echo '' >> app.py && \
+    echo 'app = Flask(__name__)' >> app.py && \
+    echo '' >> app.py && \
+    echo '@app.route("/")' >> app.py && \
+    echo 'def health():' >> app.py && \
+    echo '    return jsonify({' >> app.py && \
+    echo '        "status": "healthy",' >> app.py && \
+    echo '        "service": "aws-connector",' >> app.py && \
+    echo '        "region": os.getenv("AWS_REGION", "us-east-1"),' >> app.py && \
+    echo '        "ecr_registry": os.getenv("ECR_REGISTRY", "")' >> app.py && \
+    echo '    })' >> app.py && \
+    echo '' >> app.py && \
+    echo '@app.route("/api/artifacts")' >> app.py && \
+    echo 'def artifacts():' >> app.py && \
+    echo '    return jsonify({' >> app.py && \
+    echo '        "artifacts": [' >> app.py && \
+    echo '            {"name": "app1", "signed": True, "verified": True},' >> app.py && \
+    echo '            {"name": "app2", "signed": True, "verified": True}' >> app.py && \
+    echo '        ],' >> app.py && \
+    echo '        "total": 15' >> app.py && \
+    echo '    })' >> app.py && \
+    echo '' >> app.py && \
+    echo 'if __name__ == "__main__":' >> app.py && \
+    echo '    app.run(host="0.0.0.0", port=8080)' >> app.py
+
+EXPOSE 8080
+
+CMD ["python3", "app.py"]

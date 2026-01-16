@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliance-dashboard
+  labels:
+    app: compliance-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: compliance-dashboard
+  template:
+    metadata:
+      labels:
+        app: compliance-dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: quay.io/flyers22/compliance-dashboard:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: REPORT_GENERATOR_URL
+          value: "http://report-generator:8080"
+        - name: MULTI_CLOUD_ENABLED
+          value: "true"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+      volumes:
+      - name: config
+        configMap:
+          name: dashboard-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-dashboard
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: compliance-dashboard
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: compliance-dashboard
+spec:
+  to:
+    kind: Service
+    name: compliance-dashboard
+  port:
+    targetPort: 80
+

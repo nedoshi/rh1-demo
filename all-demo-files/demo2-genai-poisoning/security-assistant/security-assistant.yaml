@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: security-assistant
+  namespace: demo2-genai-poisoning
+  labels:
+    app: security-assistant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: security-assistant
+  template:
+    metadata:
+      labels:
+        app: security-assistant
+    spec:
+      containers:
+      - name: assistant
+        image: quay.io/flyers22/security-assistant:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MONITORING_ENABLED
+          value: "true"
+        - name: THREAT_DETECTION
+          value: "enabled"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+      volumes:
+      - name: config
+        configMap:
+          name: security-assistant-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: security-assistant
+  namespace: demo2-genai-poisoning
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: security-assistant
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: security-assistant
+  namespace: demo2-genai-poisoning
+spec:
+  to:
+    kind: Service
+    name: security-assistant
+  port:
+    targetPort: 80
+

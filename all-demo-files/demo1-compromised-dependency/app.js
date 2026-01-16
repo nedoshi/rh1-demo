@@ -1,0 +1,26 @@
+const express = require('express');
+const log4js = require('log4js');
+const app = express();
+const port = 8080;
+
+// Configure log4js (vulnerable version)
+log4js.configure({
+  appenders: { console: { type: 'console' } },
+  categories: { default: { appenders: ['console'], level: 'info' } }
+});
+
+const logger = log4js.getLogger();
+
+app.get('/', (req, res) => {
+  logger.info('Request received');
+  res.json({ 
+    message: 'Vulnerable App Running',
+    version: '1.0.0',
+    dependency: 'log4js@6.3.0 (VULNERABLE)'
+  });
+});
+
+app.listen(port, () => {
+  logger.info(`Vulnerable app listening on port ${port}`);
+});
+

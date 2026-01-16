@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-connector
+  namespace: demo3-compliance-audit
+  labels:
+    app: azure-connector
+    cloud: azure
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-connector
+  template:
+    metadata:
+      labels:
+        app: azure-connector
+    spec:
+      containers:
+      - name: connector
+        image: quay.io/flyers22/azure-connector:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AZURE_REGISTRY
+          value: "myregistry.azurecr.io"
+        - name: AZURE_SUBSCRIPTION
+          value: "12345678-1234-1234-1234-123456789012"
+        volumeMounts:
+        - name: credentials
+          mountPath: /etc/azure
+          readOnly: true
+      volumes:
+      - name: credentials
+        secret:
+          secretName: azure-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-connector
+  namespace: demo3-compliance-audit
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: azure-connector
+

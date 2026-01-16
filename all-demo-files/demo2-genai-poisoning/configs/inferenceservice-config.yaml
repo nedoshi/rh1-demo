@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferenceservice-config
+  namespace: demo2-genai-poisoning
+  labels:
+    app: genai-inference
+    serving.kserve.io/inferenceservice: "true"
+data:
+  # KServe/ODH InferenceService configuration
+  # This ConfigMap is required by the ODH admission webhook
+  # to validate and process InferenceService resources
+  inferenceservice.yaml: |
+    # InferenceService configuration
+    # This enables the admission webhook to process InferenceService resources
+    enabled: true
+    # Default predictor configuration
+    defaultPredictor:
+      imagePullPolicy: IfNotPresent
+    # Security settings
+    security:
+      enabled: true
+      monitoring: true
+    # Resource defaults (can be overridden per service)
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"

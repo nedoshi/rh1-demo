@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vex-statements
+  namespace: demo3-compliance-audit
+  labels:
+    app: compliance-audit
+    type: vex
+data:
+  vex-statements.json: |
+    {
+      "vex_version": "1.0",
+      "total_statements": 23,
+      "statements": [
+        {
+          "vulnerability": {
+            "cve": "CVE-2023-1234",
+            "severity": "HIGH",
+            "status": "AFFECTED"
+          },
+          "affected_artifacts": [
+            "app-frontend:v1.2.3"
+          ],
+          "remediation": {
+            "status": "AVAILABLE",
+            "version": "v1.2.4"
+          }
+        },
+        {
+          "vulnerability": {
+            "cve": "CVE-2023-5678",
+            "severity": "MEDIUM",
+            "status": "NOT_AFFECTED"
+          },
+          "affected_artifacts": [],
+          "justification": "Vulnerability does not affect this configuration"
+        }
+      ],
+      "summary": {
+        "affected": 8,
+        "remediated": 15,
+        "under_investigation": 3,
+        "false_positives": 5
+      }
+    }
+

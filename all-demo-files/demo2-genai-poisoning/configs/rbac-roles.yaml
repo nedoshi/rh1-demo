@@ -1,0 +1,57 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: data-scientist
+  namespace: demo2-genai-poisoning
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "configmaps"]
+    verbs: ["get", "list", "create"]
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns"]
+    verbs: ["get", "list", "create"]
+  - apiGroups: [""]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ml-engineer
+  namespace: demo2-genai-poisoning
+rules:
+  - apiGroups: [""]
+    resources: ["deployments", "services", "routes"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: data-scientist-binding
+  namespace: demo2-genai-poisoning
+subjects:
+  - kind: ServiceAccount
+    name: data-scientist-sa
+    namespace: demo2-genai-poisoning
+roleRef:
+  kind: Role
+  name: data-scientist
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ml-engineer-binding
+  namespace: demo2-genai-poisoning
+subjects:
+  - kind: ServiceAccount
+    name: ml-engineer-sa
+    namespace: demo2-genai-poisoning
+roleRef:
+  kind: Role
+  name: ml-engineer
+  apiGroup: rbac.authorization.k8s.io
+

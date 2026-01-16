@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-app
+  labels:
+    app: vulnerable-app
+    demo: compromised-dependency
+  annotations:
+    vulnerability.scan: "true"
+    signature.verified: "false"
+    cve.detected: "CVE-2021-44228"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnerable-app
+  template:
+    metadata:
+      labels:
+        app: vulnerable-app
+        signed: "false"
+        verified: "false"
+    spec:
+      containers:
+      - name: app
+        image: image-registry.openshift-image-registry.svc:5000/demo1-compromised-dependency/vulnerable-app:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: VULNERABLE_DEPENDENCY
+          value: "log4js@6.3.0"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

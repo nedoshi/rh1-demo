@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: compliance-report-generator
+  namespace: demo3-compliance-audit
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: generator
+        image: quay.io/flyers22/report-generator:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            echo "Generating compliance report..."
+            echo "Collecting data from all sources..."
+            echo "Aggregating multi-cloud artifacts..."
+            echo "Generating SBOM lineage..."
+            echo "Collecting VEX statements..."
+            echo "Verifying NIST SSDF compliance..."
+            echo "Compiling final report..."
+            echo ""
+            echo "Report Generated Successfully:"
+            echo "- 35 signed artifacts (AWS, Azure, OpenShift)"
+            echo "- Complete SBOM lineage (264 components)"
+            echo "- 23 VEX statements"
+            echo "- NIST SSDF compliance attestations (16/16)"
+            echo "- Cryptographic verification chain"
+            echo "- Source code → Image → Pod traceability"
+            echo ""
+            echo "Report location: /reports/compliance-report-20240115.pdf"
+  backoffLimit: 1

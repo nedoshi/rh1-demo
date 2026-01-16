@@ -1,0 +1,37 @@
+FROM registry.access.redhat.com/ubi8/python-39:latest
+
+# Install dependencies
+RUN pip3 install --no-cache-dir flask
+
+# Set working directory (creates directory automatically)
+WORKDIR /app
+
+# Create application file
+RUN echo 'from flask import Flask, jsonify' > app.py && \
+    echo 'import os' >> app.py && \
+    echo '' >> app.py && \
+    echo 'app = Flask(__name__)' >> app.py && \
+    echo '' >> app.py && \
+    echo '@app.route("/")' >> app.py && \
+    echo 'def dashboard():' >> app.py && \
+    echo '    return jsonify({' >> app.py && \
+    echo '        "status": "running",' >> app.py && \
+    echo '        "service": "compliance-dashboard",' >> app.py && \
+    echo '        "report_generator_url": os.getenv("REPORT_GENERATOR_URL", ""),' >> app.py && \
+    echo '        "multi_cloud_enabled": os.getenv("MULTI_CLOUD_ENABLED", "false")' >> app.py && \
+    echo '    })' >> app.py && \
+    echo '' >> app.py && \
+    echo '@app.route("/api/reports")' >> app.py && \
+    echo 'def reports():' >> app.py && \
+    echo '    return jsonify({' >> app.py && \
+    echo '        "reports": [' >> app.py && \
+    echo '            {"id": "20240115", "name": "Compliance Report", "status": "generated"}' >> app.py && \
+    echo '        ]' >> app.py && \
+    echo '    })' >> app.py && \
+    echo '' >> app.py && \
+    echo 'if __name__ == "__main__":' >> app.py && \
+    echo '    app.run(host="0.0.0.0", port=8080)' >> app.py
+
+EXPOSE 8080
+
+CMD ["python3", "app.py"]

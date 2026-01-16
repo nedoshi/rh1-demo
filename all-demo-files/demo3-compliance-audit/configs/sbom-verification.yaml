@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sbom-verification
+  namespace: demo3-compliance-audit
+data:
+  verification.json: |
+    {
+      "sbom_completeness": "100%",
+      "all_components_tracked": true,
+      "verification_status": "VERIFIED",
+      "missing_components": 0
+    }
+

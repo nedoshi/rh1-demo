@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-storage
+  namespace: demo2-genai-poisoning
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: nfs-storage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-registry-config
+  namespace: demo2-genai-poisoning
+data:
+  registry-url: "quay.io/demo/models"
+  signing-required: "true"
+  verification-required: "true"
+

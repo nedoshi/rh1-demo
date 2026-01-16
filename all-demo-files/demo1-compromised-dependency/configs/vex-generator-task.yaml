@@ -1,0 +1,66 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: vex-generator
+  namespace: demo1-compromised-dependency
+  labels:
+    app: vex-generator
+    demo: compromised-dependency
+spec:
+  description: Generate VEX document from vulnerability scan results
+  params:
+    - name: VULNERABILITY_DATA
+      description: Path to vulnerability report
+      type: string
+  workspaces:
+    - name: workspace
+      description: Workspace containing vulnerability data and output
+  steps:
+    - name: generate-vex
+      image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        VULN_DATA=$(params.VULNERABILITY_DATA)
+        WORKSPACE=$(workspaces.workspace.path)
+        
+        echo "📝 Generating VEX document..."
+        
+        # Read vulnerability data and generate VEX
+        cat > ${WORKSPACE}/vex.json <<'VEXEOF'
+        {
+          "vex_version": "1.0",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "author": "Trusted Profile Analyzer",
+          "statements": [
+            {
+              "vulnerability": {
+                "cve": "CVE-2021-44228",
+                "name": "Remote Code Execution in log4js",
+                "severity": "CRITICAL",
+                "cvss_score": 10.0
+              },
+              "products": [
+                {
+                  "name": "vulnerable-app",
+                  "version": "1.0.0",
+                  "status": "AFFECTED"
+                }
+              ],
+              "status": "AFFECTED",
+              "justification": "The application uses log4js@6.3.0 which contains a critical RCE vulnerability",
+              "remediation": {
+                "type": "upgrade",
+                "target": "log4js@6.4.0",
+                "status": "AVAILABLE"
+              },
+              "impact": "Remote code execution possible through malicious log messages"
+            }
+          ]
+        }
+        VEXEOF
+        
+        echo "✅ VEX document generated: ${WORKSPACE}/vex.json"
+        cat ${WORKSPACE}/vex.json
+

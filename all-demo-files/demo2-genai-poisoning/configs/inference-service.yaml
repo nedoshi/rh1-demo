@@ -1,0 +1,18 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: llm-inference
+  namespace: demo2-genai-poisoning
+  labels:
+    app: genai-inference
+spec:
+  predictor:
+    containers:
+    - name: kserve-container
+      image: quay.io/demo/llm-model:latest
+      env:
+      - name: MODEL_NAME
+        value: "llm-model-v1"
+      - name: SECURITY_MONITORING
+        value: "enabled"
+

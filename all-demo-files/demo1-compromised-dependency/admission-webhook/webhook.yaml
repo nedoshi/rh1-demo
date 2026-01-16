@@ -1,0 +1,25 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vulnerability-validator
+  labels:
+    app: admission-webhook
+    demo: compromised-dependency
+webhooks:
+  - name: vulnerability-validator.demo1.local
+    clientConfig:
+      service:
+        name: admission-webhook
+        namespace: demo1-compromised-dependency
+        path: "/validate"
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources: ["deployments"]
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Fail
+    # Note: caBundle will be injected by generate-certs.sh script
+    # For now, webhook will work but may show certificate warnings
+

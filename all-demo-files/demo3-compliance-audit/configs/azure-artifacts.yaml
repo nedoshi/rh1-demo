@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: azure-artifacts
+  namespace: demo3-compliance-audit
+  labels:
+    app: compliance-audit
+    source: azure
+data:
+  artifacts.json: |
+    {
+      "source": "Azure ACR",
+      "registry": "myregistry.azurecr.io",
+      "artifacts": [
+        {
+          "name": "api-service",
+          "tag": "v3.0.1",
+          "registry": "myregistry.azurecr.io",
+          "signature": "verified",
+          "sbom": "present",
+          "attestation": "present"
+        },
+        {
+          "name": "worker-service",
+          "tag": "v1.5.2",
+          "registry": "myregistry.azurecr.io",
+          "signature": "verified",
+          "sbom": "present",
+          "attestation": "present"
+        }
+      ],
+      "total_count": 12,
+      "verified_count": 12
+    }
+

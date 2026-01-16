@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: model-training-pipeline
+  namespace: demo2-genai-poisoning
+  labels:
+    app: genai-training
+spec:
+  params:
+    - name: MODEL_NAME
+      description: Name of the model to train
+    - name: TRAINING_DATA
+      description: Training dataset location
+    - name: OUTPUT_PATH
+      description: Output path for trained model
+  tasks:
+    - name: prepare-data
+      taskRef:
+        name: prepare-training-data
+    - name: train-model
+      taskRef:
+        name: train-llm-model
+      runAfter:
+        - prepare-data
+      params:
+        - name: MODEL_NAME
+          value: $(params.MODEL_NAME)
+        - name: TRAINING_DATA
+          value: $(params.TRAINING_DATA)
+    - name: generate-mbom
+      taskRef:
+        name: mbom-generator
+      runAfter:
+        - train-model
+      params:
+        - name: MODEL_PATH
+          value: $(params.OUTPUT_PATH)
+    - name: sign-model
+      taskRef:
+        name: sign-model-artifact
+      runAfter:
+        - generate-mbom
+      params:
+        - name: MODEL_PATH
+          value: $(params.OUTPUT_PATH)
+

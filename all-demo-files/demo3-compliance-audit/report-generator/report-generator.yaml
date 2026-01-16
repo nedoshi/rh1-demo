@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-generator
+  namespace: demo3-compliance-audit
+  labels:
+    app: report-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: report-generator
+  template:
+    metadata:
+      labels:
+        app: report-generator
+    spec:
+      containers:
+      - name: generator
+        image: quay.io/flyers22/compliance-report-generator:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AWS_CONNECTOR_URL
+          value: "http://aws-connector:8080"
+        - name: AZURE_CONNECTOR_URL
+          value: "http://azure-connector:8080"
+        volumeMounts:
+        - name: templates
+          mountPath: /templates
+      volumes:
+      - name: templates
+        configMap:
+          name: report-templates
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: report-generator
+  namespace: demo3-compliance-audit
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: report-generator
+

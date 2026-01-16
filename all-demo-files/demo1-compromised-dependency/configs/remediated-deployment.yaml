@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remediated-app
+  labels:
+    app: remediated-app
+    demo: compromised-dependency
+  annotations:
+    vulnerability.scan: "true"
+    signature.verified: "true"
+    cve.detected: "none"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: remediated-app
+  template:
+    metadata:
+      labels:
+        app: remediated-app
+        signed: "true"
+        verified: "true"
+    spec:
+      containers:
+      - name: app
+        image: image-registry.openshift-image-registry.svc:5000/demo1-compromised-dependency/remediated-app:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SECURE_DEPENDENCY
+          value: "log4js@6.4.0"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+

@@ -1,0 +1,24 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+
+# Create report generation script
+RUN echo '#!/bin/sh' > /usr/local/bin/generate-report.sh && \
+    echo 'echo "Generating compliance report..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Collecting data from all sources..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Aggregating multi-cloud artifacts..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Generating SBOM lineage..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Collecting VEX statements..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Verifying NIST SSDF compliance..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Compiling final report..."' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo ""' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Report Generated Successfully:"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "- 35 signed artifacts (AWS, Azure, OpenShift)"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "- Complete SBOM lineage (264 components)"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "- 23 VEX statements"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "- NIST SSDF compliance attestations (16/16)"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "- Cryptographic verification chain"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "- Source code → Image → Pod traceability"' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo ""' >> /usr/local/bin/generate-report.sh && \
+    echo 'echo "Report location: /reports/compliance-report-20240115.pdf"' >> /usr/local/bin/generate-report.sh && \
+    chmod +x /usr/local/bin/generate-report.sh
+
+ENTRYPOINT ["/usr/local/bin/generate-report.sh"]

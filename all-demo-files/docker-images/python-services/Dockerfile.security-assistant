@@ -1,0 +1,36 @@
+FROM registry.access.redhat.com/ubi8/python-39:latest
+
+# Install dependencies
+RUN pip3 install --no-cache-dir flask
+
+# Set working directory (creates directory automatically)
+WORKDIR /app
+
+# Create application file
+RUN echo 'from flask import Flask, jsonify' > app.py && \
+    echo 'import os' >> app.py && \
+    echo '' >> app.py && \
+    echo 'app = Flask(__name__)' >> app.py && \
+    echo '' >> app.py && \
+    echo '@app.route("/")' >> app.py && \
+    echo 'def health():' >> app.py && \
+    echo '    return jsonify({' >> app.py && \
+    echo '        "status": "healthy",' >> app.py && \
+    echo '        "service": "security-assistant",' >> app.py && \
+    echo '        "monitoring": os.getenv("MONITORING_ENABLED", "false"),' >> app.py && \
+    echo '        "threat_detection": os.getenv("THREAT_DETECTION", "disabled")' >> app.py && \
+    echo '    })' >> app.py && \
+    echo '' >> app.py && \
+    echo '@app.route("/api/detect", methods=["POST"])' >> app.py && \
+    echo 'def detect():' >> app.py && \
+    echo '    return jsonify({' >> app.py && \
+    echo '        "threat_detected": False,' >> app.py && \
+    echo '        "message": "Security assistant monitoring active"' >> app.py && \
+    echo '    })' >> app.py && \
+    echo '' >> app.py && \
+    echo 'if __name__ == "__main__":' >> app.py && \
+    echo '    app.run(host="0.0.0.0", port=8080)' >> app.py
+
+EXPOSE 8080
+
+CMD ["python3", "app.py"]

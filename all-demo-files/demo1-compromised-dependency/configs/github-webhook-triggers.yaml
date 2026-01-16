@@ -1,0 +1,255 @@
+---
+# GitHub Webhook Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-webhook-secret
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+    demo: compromised-dependency
+type: Opaque
+stringData:
+  secret: "demo1-webhook-secret-change-me"
+---
+# Service Account for EventListener
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pipeline-trigger-sa
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+---
+# Role for EventListener
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pipeline-trigger-role
+  namespace: demo1-compromised-dependency
+rules:
+  - apiGroups:
+      - triggers.tekton.dev
+    resources:
+      - eventlisteners
+      - triggerbindings
+      - triggertemplates
+      - triggers
+      - interceptors
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - tekton.dev
+    resources:
+      - pipelineruns
+      - taskruns
+    verbs:
+      - create
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+    verbs:
+      - get
+      - list
+---
+# RoleBinding for EventListener
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pipeline-trigger-rolebinding
+  namespace: demo1-compromised-dependency
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pipeline-trigger-role
+subjects:
+  - kind: ServiceAccount
+    name: pipeline-trigger-sa
+    namespace: demo1-compromised-dependency
+---
+# ClusterRole for cluster-scoped resources (ClusterInterceptors)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pipeline-trigger-cluster-role
+  labels:
+    app: github-webhook
+rules:
+  - apiGroups:
+      - triggers.tekton.dev
+    resources:
+      - clusterinterceptors
+    verbs:
+      - get
+      - list
+      - watch
+---
+# ClusterRoleBinding for EventListener (cluster-scoped permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pipeline-trigger-cluster-rolebinding
+  labels:
+    app: github-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pipeline-trigger-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: pipeline-trigger-sa
+    namespace: demo1-compromised-dependency
+---
+# TriggerBinding - Extracts data from GitHub webhook
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push-binding
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+spec:
+  params:
+    - name: git-repo-url
+      value: $(body.repository.clone_url)
+    - name: git-repo-name
+      value: $(body.repository.name)
+    - name: git-revision
+      value: $(body.head_commit.id)
+    - name: git-commit-message
+      value: $(body.head_commit.message)
+    - name: git-commit-author
+      value: $(body.head_commit.author.name)
+    - name: git-branch
+      value: $(body.ref)
+    - name: git-sha
+      value: $(body.head_commit.id)
+---
+# TriggerTemplate - Creates PipelineRun from webhook
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: vulnerable-app-pipeline-template
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+spec:
+  params:
+    - name: git-repo-url
+      description: Git repository URL
+    - name: git-repo-name
+      description: Git repository name
+    - name: git-revision
+      description: Git commit SHA
+    - name: git-commit-message
+      description: Git commit message
+    - name: git-commit-author
+      description: Git commit author
+    - name: git-branch
+      description: Git branch
+    - name: git-sha
+      description: Git commit SHA
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: vulnerable-app-build-
+        labels:
+          app: vulnerable-app
+          trigger: github-webhook
+          git-repo: $(tt.params.git-repo-name)
+          git-sha: $(tt.params.git-sha)
+          demo: compromised-dependency
+        annotations:
+          git-repo-url: $(tt.params.git-repo-url)
+          git-commit-message: $(tt.params.git-commit-message)
+          git-commit-author: $(tt.params.git-commit-author)
+          git-branch: $(tt.params.git-branch)
+      spec:
+        pipelineRef:
+          name: vulnerable-app-complete-pipeline
+        params:
+          - name: git-url
+            value: $(tt.params.git-repo-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 5Gi
+---
+# EventListener - Receives GitHub webhooks
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: github-webhook-listener
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+    demo: compromised-dependency
+spec:
+  serviceAccountName: pipeline-trigger-sa
+  triggers:
+    - name: github-push-trigger
+      bindings:
+        - ref: github-push-binding
+      template:
+        ref: vulnerable-app-pipeline-template
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "secretRef"
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: "eventTypes"
+              value:
+                - "push"
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.ref == 'refs/heads/main' || body.ref == 'refs/heads/master'"
+---
+# Service for EventListener
+apiVersion: v1
+kind: Service
+metadata:
+  name: el-github-webhook-listener
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: github-webhook-listener
+---
+# Route to expose EventListener
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: github-webhook-listener
+  namespace: demo1-compromised-dependency
+  labels:
+    app: github-webhook
+spec:
+  to:
+    kind: Service
+    name: el-github-webhook-listener
+  port:
+    targetPort: 8080
+

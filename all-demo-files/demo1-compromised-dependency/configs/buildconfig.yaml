@@ -1,0 +1,32 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: vulnerable-app
+  namespace: demo1-compromised-dependency
+  labels:
+    app: vulnerable-app
+    demo: compromised-dependency
+spec:
+  lookupPolicy:
+    local: false
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: vulnerable-app-build
+  namespace: demo1-compromised-dependency
+  labels:
+    app: vulnerable-app
+    demo: compromised-dependency
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: vulnerable-app:latest
+

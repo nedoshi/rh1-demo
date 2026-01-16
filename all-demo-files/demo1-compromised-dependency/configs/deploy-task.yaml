@@ -1,0 +1,133 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-app
+  namespace: demo1-compromised-dependency
+  labels:
+    app: deployer
+    demo: compromised-dependency
+spec:
+  description: Attempt to deploy application (will be blocked by admission webhook if vulnerable)
+  params:
+    - name: IMAGE_URL
+      description: Container image URL
+      type: string
+    - name: DEPLOYMENT_NAME
+      description: Deployment name
+      type: string
+    - name: NAMESPACE
+      description: Target namespace
+      type: string
+  workspaces:
+    - name: workspace
+      description: Workspace containing deployment manifests
+  steps:
+    - name: create-deployment
+      image: quay.io/openshift/origin-cli:latest
+      script: |
+        #!/bin/bash
+        set -e
+        
+        IMAGE_URL=$(params.IMAGE_URL)
+        DEPLOYMENT_NAME=$(params.DEPLOYMENT_NAME)
+        NAMESPACE=$(params.NAMESPACE)
+        WORKSPACE=$(workspaces.workspace.path)
+        
+        echo "🚀 Attempting to deploy ${DEPLOYMENT_NAME}..."
+        echo "   Image: ${IMAGE_URL}"
+        echo "   Namespace: ${NAMESPACE}"
+        
+        # Check if vulnerability was detected
+        VULN_DETECTED="false"
+        if [ -f "${WORKSPACE}/vulnerability-report.json" ]; then
+          VULN_COUNT=$(grep -c '"cve"' ${WORKSPACE}/vulnerability-report.json 2>/dev/null || echo "0")
+          if [ "$VULN_COUNT" -gt "0" ]; then
+            VULN_DETECTED="true"
+            echo "⚠️  Vulnerabilities detected - deployment will be blocked by admission webhook"
+          fi
+        fi
+        
+        if [ "$VULN_DETECTED" = "true" ]; then
+          # Create deployment with vulnerability annotations (will be blocked)
+          cat > ${WORKSPACE}/deployment.yaml <<EOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: ${DEPLOYMENT_NAME}
+          namespace: ${NAMESPACE}
+          labels:
+            app: ${DEPLOYMENT_NAME}
+            demo: compromised-dependency
+          annotations:
+            vulnerability.scan: "true"
+            cve.detected: "CVE-2021-44228"
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: ${DEPLOYMENT_NAME}
+          template:
+            metadata:
+              labels:
+                app: ${DEPLOYMENT_NAME}
+                vulnerable: "true"
+            spec:
+              containers:
+              - name: app
+                image: ${IMAGE_URL}
+                ports:
+                - containerPort: 8080
+                env:
+                - name: VULNERABLE_DEPENDENCY
+                  value: "log4js@6.3.0"
+        EOF
+        else
+          # Create clean deployment (will be allowed)
+          cat > ${WORKSPACE}/deployment.yaml <<EOF
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: ${DEPLOYMENT_NAME}
+          namespace: ${NAMESPACE}
+          labels:
+            app: ${DEPLOYMENT_NAME}
+            demo: compromised-dependency
+          annotations:
+            vulnerability.scan: "true"
+            cve.detected: "none"
+            signature.verified: "true"
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: ${DEPLOYMENT_NAME}
+          template:
+            metadata:
+              labels:
+                app: ${DEPLOYMENT_NAME}
+                signed: "true"
+            spec:
+              containers:
+              - name: app
+                image: ${IMAGE_URL}
+                ports:
+                - containerPort: 8080
+        EOF
+        fi
+        
+        # Attempt to apply deployment
+        echo "📤 Applying deployment..."
+        if oc apply -f ${WORKSPACE}/deployment.yaml 2>&1; then
+          echo "✅ Deployment applied successfully"
+        else
+          DEPLOY_ERROR=$?
+          if [ "$VULN_DETECTED" = "true" ]; then
+            echo "❌ Deployment was BLOCKED by admission webhook (expected)"
+            echo "   Reason: Vulnerable dependency detected (CVE-2021-44228)"
+            exit 0  # Don't fail the task - blocking is expected
+          else
+            echo "❌ Deployment failed unexpectedly"
+            exit $DEPLOY_ERROR
+          fi
+        fi
+

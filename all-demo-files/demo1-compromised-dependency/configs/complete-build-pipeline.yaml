@@ -1,0 +1,114 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: vulnerable-app-complete-pipeline
+  namespace: demo1-compromised-dependency
+  labels:
+    app: vulnerable-app
+    demo: compromised-dependency
+spec:
+  description: "Complete pipeline: Git -> Build -> SBOM -> Vulnerability Scan -> VEX -> Deploy (blocked by webhook)"
+  params:
+    - name: git-url
+      description: Git repository URL
+      type: string
+    - name: git-revision
+      description: Git revision (commit SHA or branch)
+      type: string
+      default: "main"
+  workspaces:
+    - name: source
+      description: Workspace for source code and artifacts
+  tasks:
+    # Step 1: Fetch source from Git
+    - name: fetch-source
+      taskRef:
+        apiVersion: tekton.dev/v1beta1
+        kind: ClusterTask
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+      workspaces:
+        - name: output
+          workspace: source
+    
+    # Step 2: Build container image
+    - name: build-image
+      runAfter: [fetch-source]
+      taskRef:
+        apiVersion: tekton.dev/v1beta1
+        kind: ClusterTask
+        name: buildah
+      params:
+        - name: IMAGE
+          value: image-registry.openshift-image-registry.svc:5000/demo1-compromised-dependency/vulnerable-app:latest
+      workspaces:
+        - name: source
+          workspace: source
+    
+    # Step 3: Generate SBOM
+    - name: generate-sbom
+      runAfter: [build-image]
+      taskRef:
+        name: sbom-generator
+        kind: Task
+      params:
+        - name: IMAGE_URL
+          value: image-registry.openshift-image-registry.svc:5000/demo1-compromised-dependency/vulnerable-app:latest
+        - name: APP_NAME
+          value: vulnerable-app
+      workspaces:
+        - name: workspace
+          workspace: source
+      # Note: SBOM will be written to workspace, vulnerability scanner will read it
+    
+    # Step 4: Scan for vulnerabilities
+    - name: scan-vulnerabilities
+      runAfter: [generate-sbom]
+      taskRef:
+        name: vulnerability-scanner
+        kind: Task
+      params:
+        - name: SBOM_PATH
+          value: $(workspaces.source.path)/sbom.spdx.json
+        - name: IMAGE_URL
+          value: image-registry.openshift-image-registry.svc:5000/demo1-compromised-dependency/vulnerable-app:latest
+      workspaces:
+        - name: workspace
+          workspace: source
+      # Note: Reads SBOM from previous step, writes vulnerability report
+    
+    # Step 5: Generate VEX document
+    - name: generate-vex
+      runAfter: [scan-vulnerabilities]
+      taskRef:
+        name: vex-generator
+        kind: Task
+      params:
+        - name: VULNERABILITY_DATA
+          value: $(workspaces.source.path)/vulnerability-report.json
+      workspaces:
+        - name: workspace
+          workspace: source
+    
+    # Step 6: Attempt deployment (will be blocked by admission webhook)
+    - name: attempt-deployment
+      runAfter: [generate-vex]
+      taskRef:
+        name: deploy-app
+        kind: Task
+      params:
+        - name: IMAGE_URL
+          value: image-registry.openshift-image-registry.svc:5000/demo1-compromised-dependency/vulnerable-app:latest
+        - name: DEPLOYMENT_NAME
+          value: vulnerable-app
+        - name: NAMESPACE
+          value: demo1-compromised-dependency
+      workspaces:
+        - name: workspace
+          workspace: source
+      # Note: This deployment will be blocked by admission webhook due to CVE annotation
+
